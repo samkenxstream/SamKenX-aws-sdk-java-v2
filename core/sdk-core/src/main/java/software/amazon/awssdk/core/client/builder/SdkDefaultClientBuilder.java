@@ -20,6 +20,7 @@ import static software.amazon.awssdk.core.ClientType.SYNC;
 import static software.amazon.awssdk.core.client.config.SdkAdvancedAsyncClientOption.FUTURE_COMPLETION_EXECUTOR;
 import static software.amazon.awssdk.core.client.config.SdkAdvancedClientOption.DISABLE_HOST_PREFIX_INJECTION;
 import static software.amazon.awssdk.core.client.config.SdkAdvancedClientOption.SIGNER;
+import static software.amazon.awssdk.core.client.config.SdkAdvancedClientOption.TOKEN_SIGNER;
 import static software.amazon.awssdk.core.client.config.SdkAdvancedClientOption.USER_AGENT_PREFIX;
 import static software.amazon.awssdk.core.client.config.SdkAdvancedClientOption.USER_AGENT_SUFFIX;
 import static software.amazon.awssdk.core.client.config.SdkClientOption.ADDITIONAL_HTTP_HEADERS;
@@ -35,6 +36,7 @@ import static software.amazon.awssdk.core.client.config.SdkClientOption.EXECUTIO
 import static software.amazon.awssdk.core.client.config.SdkClientOption.INTERNAL_USER_AGENT;
 import static software.amazon.awssdk.core.client.config.SdkClientOption.METRIC_PUBLISHERS;
 import static software.amazon.awssdk.core.client.config.SdkClientOption.PROFILE_FILE;
+import static software.amazon.awssdk.core.client.config.SdkClientOption.PROFILE_FILE_SUPPLIER;
 import static software.amazon.awssdk.core.client.config.SdkClientOption.PROFILE_NAME;
 import static software.amazon.awssdk.core.client.config.SdkClientOption.RETRY_POLICY;
 import static software.amazon.awssdk.core.client.config.SdkClientOption.SCHEDULED_EXECUTOR_SERVICE;
@@ -85,6 +87,7 @@ import software.amazon.awssdk.http.async.AsyncExecuteRequest;
 import software.amazon.awssdk.http.async.SdkAsyncHttpClient;
 import software.amazon.awssdk.metrics.MetricPublisher;
 import software.amazon.awssdk.profiles.ProfileFile;
+import software.amazon.awssdk.profiles.ProfileFileSupplier;
 import software.amazon.awssdk.profiles.ProfileFileSystemSetting;
 import software.amazon.awssdk.utils.AttributeMap;
 import software.amazon.awssdk.utils.Either;
@@ -115,6 +118,8 @@ public abstract class SdkDefaultClientBuilder<B extends SdkClientBuilder<B, C>, 
     private static final SdkAsyncHttpClient.Builder DEFAULT_ASYNC_HTTP_CLIENT_BUILDER = new DefaultSdkAsyncHttpClientBuilder();
 
     protected final SdkClientConfiguration.Builder clientConfiguration = SdkClientConfiguration.builder();
+
+    protected final AttributeMap.Builder clientContextParams = AttributeMap.builder();
 
     private final SdkHttpClient.Builder defaultHttpClientBuilder;
     private final SdkAsyncHttpClient.Builder defaultAsyncHttpClientBuilder;
@@ -164,6 +169,7 @@ public abstract class SdkDefaultClientBuilder<B extends SdkClientBuilder<B, C>, 
      * </ol>
      */
     protected final SdkClientConfiguration syncClientConfiguration() {
+        clientConfiguration.option(SdkClientOption.CLIENT_CONTEXT_PARAMS, clientContextParams.build());
         SdkClientConfiguration configuration = clientConfiguration.build();
 
         // Apply overrides
@@ -191,6 +197,7 @@ public abstract class SdkDefaultClientBuilder<B extends SdkClientBuilder<B, C>, 
      * </ol>
      */
     protected final SdkClientConfiguration asyncClientConfiguration() {
+        clientConfiguration.option(SdkClientOption.CLIENT_CONTEXT_PARAMS, clientContextParams.build());
         SdkClientConfiguration configuration = clientConfiguration.build();
 
         // Apply overrides
@@ -225,10 +232,13 @@ public abstract class SdkDefaultClientBuilder<B extends SdkClientBuilder<B, C>, 
         builder.option(API_CALL_ATTEMPT_TIMEOUT, clientOverrideConfiguration.apiCallAttemptTimeout().orElse(null));
         builder.option(DISABLE_HOST_PREFIX_INJECTION,
                        clientOverrideConfiguration.advancedOption(DISABLE_HOST_PREFIX_INJECTION).orElse(null));
-        builder.option(PROFILE_FILE, clientOverrideConfiguration.defaultProfileFile().orElse(null));
+        builder.option(PROFILE_FILE_SUPPLIER, clientOverrideConfiguration.defaultProfileFile()
+                                                                         .map(ProfileFileSupplier::fixedProfileFile)
+                                                                         .orElse(null));
         builder.option(PROFILE_NAME, clientOverrideConfiguration.defaultProfileName().orElse(null));
         builder.option(METRIC_PUBLISHERS, clientOverrideConfiguration.metricPublishers());
         builder.option(EXECUTION_ATTRIBUTES, clientOverrideConfiguration.executionAttributes());
+        builder.option(TOKEN_SIGNER, clientOverrideConfiguration.advancedOption(TOKEN_SIGNER).orElse(null));
 
         clientOverrideConfiguration.advancedOption(ENDPOINT_OVERRIDDEN_OVERRIDE).ifPresent(value -> {
             builder.option(ENDPOINT_OVERRIDDEN, value);
@@ -254,12 +264,14 @@ public abstract class SdkDefaultClientBuilder<B extends SdkClientBuilder<B, C>, 
      */
     private SdkClientConfiguration mergeGlobalDefaults(SdkClientConfiguration configuration) {
         // Don't load the default profile file if the customer already gave us one.
-        ProfileFile configuredProfileFile = configuration.option(PROFILE_FILE);
-        ProfileFile profileFile = configuredProfileFile != null ? configuredProfileFile : ProfileFile.defaultProfileFile();
+        Supplier<ProfileFile> configuredProfileFileSupplier = configuration.option(PROFILE_FILE_SUPPLIER);
+        Supplier<ProfileFile> profileFileSupplier = Optional.ofNullable(configuredProfileFileSupplier)
+                                                            .orElseGet(() -> ProfileFile::defaultProfileFile);
 
         return configuration.merge(c -> c.option(EXECUTION_INTERCEPTORS, new ArrayList<>())
                                          .option(ADDITIONAL_HTTP_HEADERS, new LinkedHashMap<>())
-                                         .option(PROFILE_FILE, profileFile)
+                                         .option(PROFILE_FILE, profileFileSupplier.get())
+                                         .option(PROFILE_FILE_SUPPLIER, profileFileSupplier)
                                          .option(PROFILE_NAME, ProfileFileSystemSetting.AWS_PROFILE.getStringValueOrThrow())
                                          .option(USER_AGENT_PREFIX, SdkUserAgent.create().userAgent())
                                          .option(USER_AGENT_SUFFIX, "")
@@ -324,7 +336,7 @@ public abstract class SdkDefaultClientBuilder<B extends SdkClientBuilder<B, C>, 
         }
 
         RetryMode retryMode = RetryMode.resolver()
-                                       .profileFile(() -> config.option(SdkClientOption.PROFILE_FILE))
+                                       .profileFile(config.option(SdkClientOption.PROFILE_FILE_SUPPLIER))
                                        .profileName(config.option(SdkClientOption.PROFILE_NAME))
                                        .defaultRetryMode(config.option(SdkClientOption.DEFAULT_RETRY_MODE))
                                        .resolve();
@@ -374,9 +386,6 @@ public abstract class SdkDefaultClientBuilder<B extends SdkClientBuilder<B, C>, 
      * Finalize which async executor service will be used for the created client. The default async executor
      * service has at least 8 core threads and can scale up to at least 64 threads when needed depending
      * on the number of processors available.
-     *
-     * This uses the same default executor in S3NativeClientConfiguration#resolveAsyncFutureCompletionExecutor.
-     * Make sure you update that method if you update the defaults here.
      */
     private Executor resolveAsyncFutureCompletionExecutor(SdkClientConfiguration config) {
         Supplier<Executor> defaultExecutor = () -> {

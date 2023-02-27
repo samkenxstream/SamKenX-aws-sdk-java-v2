@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Supplier;
 import software.amazon.awssdk.annotations.SdkProtectedApi;
 import software.amazon.awssdk.core.ClientType;
 import software.amazon.awssdk.core.ServiceConfiguration;
@@ -27,10 +28,12 @@ import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
 import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
 import software.amazon.awssdk.core.retry.RetryMode;
 import software.amazon.awssdk.core.retry.RetryPolicy;
+import software.amazon.awssdk.endpoints.EndpointProvider;
 import software.amazon.awssdk.http.SdkHttpClient;
 import software.amazon.awssdk.http.async.SdkAsyncHttpClient;
 import software.amazon.awssdk.metrics.MetricPublisher;
 import software.amazon.awssdk.profiles.ProfileFile;
+import software.amazon.awssdk.utils.AttributeMap;
 
 /**
  * A set of internal options required by the SDK via {@link SdkClientConfiguration}.
@@ -124,8 +127,22 @@ public final class SdkClientOption<T> extends ClientOption<T> {
 
     /**
      * The profile file to use for this client.
+     *
+     * @deprecated This option was used to:
+     *             - Read configuration options in profile files in aws-core, sdk-core
+     *             - Build service configuration objects from profile files in codegen, s3control
+     *             - Build service configuration objects from profile files, set endpoint options in s3
+     *             - Set retry mode in dynamodb, kinesis
+     * This has been replaced with {@code PROFILE_FILE_SUPPLIER.get()}.
      */
+    @Deprecated
     public static final SdkClientOption<ProfileFile> PROFILE_FILE = new SdkClientOption<>(ProfileFile.class);
+
+    /**
+     * The profile file supplier to use for this client.
+     */
+    public static final SdkClientOption<Supplier<ProfileFile>> PROFILE_FILE_SUPPLIER =
+        new SdkClientOption<>(new UnsafeValueType(Supplier.class));
 
     /**
      * The profile name to use for this client.
@@ -161,6 +178,17 @@ public final class SdkClientOption<T> extends ClientOption<T> {
      * @see RetryMode.Resolver#defaultRetryMode(RetryMode)
      */
     public static final SdkClientOption<RetryMode> DEFAULT_RETRY_MODE = new SdkClientOption<>(RetryMode.class);
+
+    /**
+     * The {@link EndpointProvider} configured on the client.
+     */
+    public static final SdkClientOption<EndpointProvider> ENDPOINT_PROVIDER = new SdkClientOption<>(EndpointProvider.class);
+
+    /**
+     * The container for any client contexts parameters set on the client.
+     */
+    public static final SdkClientOption<AttributeMap> CLIENT_CONTEXT_PARAMS =
+        new SdkClientOption<>(AttributeMap.class);
 
     private SdkClientOption(Class<T> valueClass) {
         super(valueClass);

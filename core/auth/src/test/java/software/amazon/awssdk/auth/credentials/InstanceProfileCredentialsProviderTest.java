@@ -41,6 +41,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Rule;
@@ -49,7 +53,12 @@ import org.junit.rules.ExpectedException;
 import software.amazon.awssdk.core.SdkSystemSetting;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.util.SdkUserAgent;
+import software.amazon.awssdk.profiles.ProfileFile;
+import software.amazon.awssdk.profiles.ProfileFileSupplier;
+import software.amazon.awssdk.profiles.ProfileProperty;
 import software.amazon.awssdk.utils.DateUtils;
+import software.amazon.awssdk.utils.Pair;
+import software.amazon.awssdk.utils.StringInputStream;
 
 public class InstanceProfileCredentialsProviderTest {
     private static final String TOKEN_RESOURCE_PATH = "/latest/api/token";
@@ -255,6 +264,90 @@ public class InstanceProfileCredentialsProviderTest {
     }
 
     @Test
+    public void resolveCredentials_customProfileFileSupplierAndNameSettingEndpointOverride_usesCorrectEndpointFromSupplier() {
+        System.clearProperty(SdkSystemSetting.AWS_EC2_METADATA_SERVICE_ENDPOINT.property());
+        WireMockServer mockMetadataEndpoint_2 = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        mockMetadataEndpoint_2.start();
+        try {
+            String stubToken = "some-token";
+            mockMetadataEndpoint_2.stubFor(put(urlPathEqualTo(TOKEN_RESOURCE_PATH)).willReturn(aResponse().withBody(stubToken)));
+            mockMetadataEndpoint_2.stubFor(get(urlPathEqualTo(CREDENTIALS_RESOURCE_PATH)).willReturn(aResponse().withBody("some-profile")));
+            mockMetadataEndpoint_2.stubFor(get(urlPathEqualTo(CREDENTIALS_RESOURCE_PATH + "some-profile")).willReturn(aResponse().withBody(STUB_CREDENTIALS)));
+
+            String mockServer2Endpoint = "http://localhost:" + mockMetadataEndpoint_2.port();
+
+            ProfileFile config = configFile("profile test",
+                                            Pair.of(ProfileProperty.EC2_METADATA_SERVICE_ENDPOINT, mockServer2Endpoint));
+
+            List<ProfileFile> profileFileList = Arrays.asList(credentialFile("test", "key1", "secret1"),
+                                                              credentialFile("test", "key2", "secret2"),
+                                                              credentialFile("test", "key3", "secret3"));
+
+            InstanceProfileCredentialsProvider provider = InstanceProfileCredentialsProvider
+                .builder()
+                .profileFile(ProfileFileSupplier.aggregate(supply(profileFileList), () -> config))
+                .profileName("test")
+                .build();
+
+            AwsCredentials awsCredentials1 = provider.resolveCredentials();
+
+            assertThat(awsCredentials1).isNotNull();
+
+            String userAgentHeader = "User-Agent";
+            String userAgent = SdkUserAgent.create().userAgent();
+            mockMetadataEndpoint_2.verify(putRequestedFor(urlPathEqualTo(TOKEN_RESOURCE_PATH)).withHeader(userAgentHeader, equalTo(userAgent)));
+            mockMetadataEndpoint_2.verify(getRequestedFor(urlPathEqualTo(CREDENTIALS_RESOURCE_PATH)).withHeader(userAgentHeader, equalTo(userAgent)));
+            mockMetadataEndpoint_2.verify(getRequestedFor(urlPathEqualTo(CREDENTIALS_RESOURCE_PATH + "some-profile")).withHeader(userAgentHeader, equalTo(userAgent)));
+
+            // all requests should have gone to the second server, and none to the other one
+            mockMetadataEndpoint.verify(0, RequestPatternBuilder.allRequests());
+        } finally {
+            mockMetadataEndpoint_2.stop();
+        }
+    }
+
+    @Test
+    public void resolveCredentials_customSupplierProfileFileAndNameSettingEndpointOverride_usesCorrectEndpointFromSupplier() {
+        System.clearProperty(SdkSystemSetting.AWS_EC2_METADATA_SERVICE_ENDPOINT.property());
+        WireMockServer mockMetadataEndpoint_2 = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        mockMetadataEndpoint_2.start();
+        try {
+            String stubToken = "some-token";
+            mockMetadataEndpoint_2.stubFor(put(urlPathEqualTo(TOKEN_RESOURCE_PATH)).willReturn(aResponse().withBody(stubToken)));
+            mockMetadataEndpoint_2.stubFor(get(urlPathEqualTo(CREDENTIALS_RESOURCE_PATH)).willReturn(aResponse().withBody("some-profile")));
+            mockMetadataEndpoint_2.stubFor(get(urlPathEqualTo(CREDENTIALS_RESOURCE_PATH + "some-profile")).willReturn(aResponse().withBody(STUB_CREDENTIALS)));
+
+            String mockServer2Endpoint = "http://localhost:" + mockMetadataEndpoint_2.port();
+
+            ProfileFile config = configFile("profile test",
+                                            Pair.of(ProfileProperty.EC2_METADATA_SERVICE_ENDPOINT, mockServer2Endpoint));
+
+            Supplier<ProfileFile> supplier = () -> config;
+
+            InstanceProfileCredentialsProvider provider = InstanceProfileCredentialsProvider
+                .builder()
+                .profileFile(supplier)
+                .profileName("test")
+                .build();
+
+            AwsCredentials awsCredentials1 = provider.resolveCredentials();
+
+            assertThat(awsCredentials1).isNotNull();
+
+            String userAgentHeader = "User-Agent";
+            String userAgent = SdkUserAgent.create().userAgent();
+            mockMetadataEndpoint_2.verify(putRequestedFor(urlPathEqualTo(TOKEN_RESOURCE_PATH)).withHeader(userAgentHeader, equalTo(userAgent)));
+            mockMetadataEndpoint_2.verify(getRequestedFor(urlPathEqualTo(CREDENTIALS_RESOURCE_PATH)).withHeader(userAgentHeader, equalTo(userAgent)));
+            mockMetadataEndpoint_2.verify(getRequestedFor(urlPathEqualTo(CREDENTIALS_RESOURCE_PATH + "some-profile")).withHeader(userAgentHeader, equalTo(userAgent)));
+
+            // all requests should have gone to the second server, and none to the other one
+            mockMetadataEndpoint.verify(0, RequestPatternBuilder.allRequests());
+        } finally {
+            mockMetadataEndpoint_2.stop();
+        }
+    }
+
+    @Test
     public void resolveCredentials_doesNotFailIfImdsReturnsExpiredCredentials() {
         String credentialsResponse =
             "{"
@@ -361,10 +454,10 @@ public class InstanceProfileCredentialsProviderTest {
         stubCredentialsResponse(aResponse().withBody(successfulCredentialsResponse1));
         AwsCredentials credentials24HoursAgo = credentialsProvider.resolveCredentials();
 
-        // Set the time to 3 minutes before expiration, and fail to call IMDS
-        clock.time = now.minus(3, MINUTES);
+        // Set the time to 10 minutes before expiration, and fail to call IMDS
+        clock.time = now.minus(10, MINUTES);
         stubCredentialsResponse(aResponse().withStatus(500));
-        AwsCredentials credentials3MinutesAgo = credentialsProvider.resolveCredentials();
+        AwsCredentials credentials10MinutesAgo = credentialsProvider.resolveCredentials();
 
         // Set the time to 10 seconds before expiration, and verify that we still call IMDS to try to get credentials in at the
         // last moment before expiration
@@ -372,9 +465,45 @@ public class InstanceProfileCredentialsProviderTest {
         stubCredentialsResponse(aResponse().withBody(successfulCredentialsResponse2));
         AwsCredentials credentials10SecondsAgo = credentialsProvider.resolveCredentials();
 
-        assertThat(credentials24HoursAgo).isEqualTo(credentials3MinutesAgo);
+        assertThat(credentials24HoursAgo).isEqualTo(credentials10MinutesAgo);
         assertThat(credentials24HoursAgo.secretAccessKey()).isEqualTo("SECRET_ACCESS_KEY");
         assertThat(credentials10SecondsAgo.secretAccessKey()).isEqualTo("SECRET_ACCESS_KEY2");
+    }
+
+    @Test
+    public void imdsCallFrequencyIsLimited() {
+        // Requires running the test multiple times to account for refresh jitter
+        for (int i = 0; i < 10; i++) {
+            AdjustableClock clock = new AdjustableClock();
+            AwsCredentialsProvider credentialsProvider = credentialsProviderWithClock(clock);
+            Instant now = Instant.now();
+            String successfulCredentialsResponse1 =
+                "{"
+                + "\"AccessKeyId\":\"ACCESS_KEY_ID\","
+                + "\"SecretAccessKey\":\"SECRET_ACCESS_KEY\","
+                + "\"Expiration\":\"" + DateUtils.formatIso8601Date(now) + '"'
+                + "}";
+
+            String successfulCredentialsResponse2 =
+                "{"
+                + "\"AccessKeyId\":\"ACCESS_KEY_ID2\","
+                + "\"SecretAccessKey\":\"SECRET_ACCESS_KEY2\","
+                + "\"Expiration\":\"" + DateUtils.formatIso8601Date(now.plus(6, HOURS)) + '"'
+                + "}";
+
+            // Set the time to 5 minutes before expiration and call IMDS
+            clock.time = now.minus(5, MINUTES);
+            stubCredentialsResponse(aResponse().withBody(successfulCredentialsResponse1));
+            AwsCredentials credentials5MinutesAgo = credentialsProvider.resolveCredentials();
+
+            // Set the time to 2 seconds before expiration, and verify that do not call IMDS because it hasn't been 5 minutes yet
+            clock.time = now.minus(2, SECONDS);
+            stubCredentialsResponse(aResponse().withBody(successfulCredentialsResponse2));
+            AwsCredentials credentials2SecondsAgo = credentialsProvider.resolveCredentials();
+
+            assertThat(credentials2SecondsAgo).isEqualTo(credentials5MinutesAgo);
+            assertThat(credentials5MinutesAgo.secretAccessKey()).isEqualTo("SECRET_ACCESS_KEY");
+        }
     }
 
     private AwsCredentialsProvider credentialsProviderWithClock(Clock clock) {
@@ -411,4 +540,38 @@ public class InstanceProfileCredentialsProviderTest {
             return time;
         }
     }
+
+    private static ProfileFileSupplier supply(Iterable<ProfileFile> iterable) {
+        return iterable.iterator()::next;
+    }
+
+    private ProfileFile credentialFile(String credentialFile) {
+        return ProfileFile.builder()
+                          .content(new StringInputStream(credentialFile))
+                          .type(ProfileFile.Type.CREDENTIALS)
+                          .build();
+    }
+
+    private ProfileFile configFile(String credentialFile) {
+        return ProfileFile.builder()
+                          .content(new StringInputStream(credentialFile))
+                          .type(ProfileFile.Type.CONFIGURATION)
+                          .build();
+    }
+
+    private ProfileFile credentialFile(String name, String accessKeyId, String secretAccessKey) {
+        String contents = String.format("[%s]\naws_access_key_id = %s\naws_secret_access_key = %s\n",
+                                        name, accessKeyId, secretAccessKey);
+        return credentialFile(contents);
+    }
+
+    private ProfileFile configFile(String name, Pair<?, ?>... pairs) {
+        String values = Arrays.stream(pairs)
+                              .map(pair -> String.format("%s=%s", pair.left(), pair.right()))
+                              .collect(Collectors.joining(System.lineSeparator()));
+        String contents = String.format("[%s]\n%s", name, values);
+
+        return configFile(contents);
+    }
+
 }

@@ -68,6 +68,8 @@ public final class Constant {
 
     public static final String PACKAGE_NAME_WAITERS_PATTERN = "%s.waiters";
 
+    public static final String PACKAGE_NAME_RULES_PATTERN = "%s.endpoints";
+
     public static final String PACKAGE_NAME_SMOKE_TEST_PATTERN = "%s.smoketests";
 
     public static final String PACKAGE_NAME_CUSTOM_AUTH_PATTERN = "%s.auth";
@@ -91,6 +93,13 @@ public final class Constant {
     public static final String AWS_DOCS_HOST = "docs.aws.amazon.com";
 
     public static final String APPROVED_SIMPLE_METHOD_VERBS = "(get|list|describe|lookup|batchGet).*";
+
+    public static final String ASYNC_STREAMING_INPUT_PARAM = "requestBody";
+    public static final String ASYNC_STREAMING_OUTPUT_PARAM = "asyncResponseTransformer";
+    public static final String SYNC_STREAMING_INPUT_PARAM = "requestBody";
+    public static final String SYNC_STREAMING_OUTPUT_PARAM = "responseTransformer";
+    public static final String EVENT_PUBLISHER_PARAM_NAME = "requestStream";
+    public static final String EVENT_RESPONSE_HANDLER_PARAM_NAME = "asyncResponseHandler";
 
     private Constant() {
     }

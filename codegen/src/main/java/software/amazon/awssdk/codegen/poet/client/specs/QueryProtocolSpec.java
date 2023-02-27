@@ -27,9 +27,10 @@ import javax.lang.model.element.Modifier;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
 import software.amazon.awssdk.codegen.model.intermediate.OperationModel;
-import software.amazon.awssdk.codegen.poet.PoetExtensions;
+import software.amazon.awssdk.codegen.poet.PoetExtension;
 import software.amazon.awssdk.codegen.poet.client.traits.HttpChecksumRequiredTrait;
 import software.amazon.awssdk.codegen.poet.client.traits.HttpChecksumTrait;
+import software.amazon.awssdk.codegen.poet.client.traits.NoneAuthTypeRequestTrait;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.core.client.handler.ClientExecutionParams;
 import software.amazon.awssdk.core.http.HttpResponseHandler;
@@ -38,10 +39,10 @@ import software.amazon.awssdk.utils.CompletableFutureUtils;
 
 public class QueryProtocolSpec implements ProtocolSpec {
 
-    protected final PoetExtensions poetExtensions;
+    protected final PoetExtension poetExtensions;
     protected final IntermediateModel intermediateModel;
 
-    public QueryProtocolSpec(IntermediateModel intermediateModel, PoetExtensions poetExtensions) {
+    public QueryProtocolSpec(IntermediateModel intermediateModel, PoetExtension poetExtensions) {
         this.intermediateModel = intermediateModel;
         this.poetExtensions = poetExtensions;
     }
@@ -110,10 +111,13 @@ public class QueryProtocolSpec implements ProtocolSpec {
                      .add(".withErrorResponseHandler(errorResponseHandler)\n")
                      .add(hostPrefixExpression(opModel))
                      .add(discoveredEndpoint(opModel))
+                     .add(credentialType(opModel, intermediateModel))
                      .add(".withInput($L)", opModel.getInput().getVariableName())
                      .add(".withMetricCollector(apiCallMetricCollector)")
                      .add(HttpChecksumRequiredTrait.putHttpChecksumAttribute(opModel))
-                     .add(HttpChecksumTrait.create(opModel));
+                     .add(HttpChecksumTrait.create(opModel))
+                     .add(NoneAuthTypeRequestTrait.create(opModel));
+
 
         if (opModel.hasStreamingInput()) {
             return codeBlock.add(".withRequestBody(requestBody)")
@@ -143,9 +147,12 @@ public class QueryProtocolSpec implements ProtocolSpec {
                           asyncMarshaller(intermediateModel, opModel, marshaller, "protocolFactory"))
                      .add(".withResponseHandler(responseHandler)\n")
                      .add(".withErrorResponseHandler(errorResponseHandler)\n")
+                     .add(credentialType(opModel, intermediateModel))
                      .add(".withMetricCollector(apiCallMetricCollector)\n")
                      .add(HttpChecksumRequiredTrait.putHttpChecksumAttribute(opModel))
-                     .add(HttpChecksumTrait.create(opModel));
+                     .add(HttpChecksumTrait.create(opModel))
+                     .add(NoneAuthTypeRequestTrait.create(opModel));
+
 
         builder.add(hostPrefixExpression(opModel) + asyncRequestBody + ".withInput($L)$L);",
                     opModel.getInput().getVariableName(),

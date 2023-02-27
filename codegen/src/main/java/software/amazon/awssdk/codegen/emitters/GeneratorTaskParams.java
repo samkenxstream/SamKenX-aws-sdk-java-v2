@@ -20,7 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.codegen.emitters.tasks.SharedModelsTaskParamsValidator;
 import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
-import software.amazon.awssdk.codegen.poet.PoetExtensions;
+import software.amazon.awssdk.codegen.poet.PoetExtension;
 
 /**
  * Parameters for generator tasks.
@@ -30,18 +30,19 @@ public class GeneratorTaskParams {
 
     private final IntermediateModel model;
     private final GeneratorPathProvider pathProvider;
-    private final PoetExtensions poetExtensions;
+    private final PoetExtension poetExtensions;
     private final Logger log = LoggerFactory.getLogger(GeneratorTaskParams.class);
 
     private GeneratorTaskParams(IntermediateModel model,
                                 GeneratorPathProvider pathProvider) {
         this.model = model;
         this.pathProvider = pathProvider;
-        this.poetExtensions = new PoetExtensions(model);
+        this.poetExtensions = new PoetExtension(model);
     }
 
-    public static GeneratorTaskParams create(IntermediateModel model, String sourceDirectory, String testDirectory) {
-        GeneratorPathProvider pathProvider = new GeneratorPathProvider(model, sourceDirectory, testDirectory);
+    public static GeneratorTaskParams create(IntermediateModel model, String sourceDirectory, String testDirectory,
+                                             String resourcesDirectory) {
+        GeneratorPathProvider pathProvider = new GeneratorPathProvider(model, sourceDirectory, testDirectory, resourcesDirectory);
         GeneratorTaskParams params = new GeneratorTaskParams(model, pathProvider);
         TASK_PARAMS_VALIDATORS.accept(params);
         return params;
@@ -64,7 +65,7 @@ public class GeneratorTaskParams {
     /**
      * @return Extensions and convenience methods for Java Poet.
      */
-    public PoetExtensions getPoetExtensions() {
+    public PoetExtension getPoetExtensions() {
         return poetExtensions;
     }
 

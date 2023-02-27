@@ -17,6 +17,8 @@ import software.amazon.awssdk.services.json.model.APostOperationRequest;
 import software.amazon.awssdk.services.json.model.APostOperationResponse;
 import software.amazon.awssdk.services.json.model.APostOperationWithOutputRequest;
 import software.amazon.awssdk.services.json.model.APostOperationWithOutputResponse;
+import software.amazon.awssdk.services.json.model.BearerAuthOperationRequest;
+import software.amazon.awssdk.services.json.model.BearerAuthOperationResponse;
 import software.amazon.awssdk.services.json.model.GetOperationWithChecksumRequest;
 import software.amazon.awssdk.services.json.model.GetOperationWithChecksumResponse;
 import software.amazon.awssdk.services.json.model.GetWithoutRequiredMembersRequest;
@@ -56,22 +58,6 @@ public interface JsonClient extends SdkClient {
      * {@link software.amazon.awssdk.regions.ServiceMetadataProvider}.
      */
     String SERVICE_METADATA_ID = "json-service-endpoint";
-
-    /**
-     * Create a {@link JsonClient} with the region loaded from the
-     * {@link software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain} and credentials loaded from the
-     * {@link software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider}.
-     */
-    static JsonClient create() {
-        return builder().build();
-    }
-
-    /**
-     * Create a builder that can be used to configure and create a {@link JsonClient}.
-     */
-    static JsonClientBuilder builder() {
-        return new DefaultJsonClientBuilder();
-    }
 
     /**
      * <p>
@@ -193,6 +179,55 @@ public interface JsonClient extends SdkClient {
                                                                                                   AwsServiceException, SdkClientException, JsonException {
         return aPostOperationWithOutput(APostOperationWithOutputRequest.builder().applyMutation(aPostOperationWithOutputRequest)
                                                                        .build());
+    }
+
+    /**
+     * Invokes the BearerAuthOperation operation.
+     *
+     * @param bearerAuthOperationRequest
+     * @return Result of the BearerAuthOperation operation returned by the service.
+     * @throws SdkException
+     *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
+     *         catch all scenarios.
+     * @throws SdkClientException
+     *         If any client side error occurs such as an IO related failure, failure to get credentials, etc.
+     * @throws JsonException
+     *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
+     * @sample JsonClient.BearerAuthOperation
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/BearerAuthOperation"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default BearerAuthOperationResponse bearerAuthOperation(BearerAuthOperationRequest bearerAuthOperationRequest)
+        throws AwsServiceException, SdkClientException, JsonException {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Invokes the BearerAuthOperation operation.<br/>
+     * <p>
+     * This is a convenience which creates an instance of the {@link BearerAuthOperationRequest.Builder} avoiding the
+     * need to create one manually via {@link BearerAuthOperationRequest#builder()}
+     * </p>
+     *
+     * @param bearerAuthOperationRequest
+     *        A {@link Consumer} that will call methods on {@link BearerAuthOperationRequest.Builder} to create a
+     *        request.
+     * @return Result of the BearerAuthOperation operation returned by the service.
+     * @throws SdkException
+     *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
+     *         catch all scenarios.
+     * @throws SdkClientException
+     *         If any client side error occurs such as an IO related failure, failure to get credentials, etc.
+     * @throws JsonException
+     *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
+     * @sample JsonClient.BearerAuthOperation
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/BearerAuthOperation"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default BearerAuthOperationResponse bearerAuthOperation(
+        Consumer<BearerAuthOperationRequest.Builder> bearerAuthOperationRequest) throws AwsServiceException,
+                                                                                        SdkClientException, JsonException {
+        return bearerAuthOperation(BearerAuthOperationRequest.builder().applyMutation(bearerAuthOperationRequest).build());
     }
 
     /**
@@ -1621,14 +1656,30 @@ public interface JsonClient extends SdkClient {
                                                                               .applyMutation(streamingOutputOperationRequest).build());
     }
 
-    static ServiceMetadata serviceMetadata() {
-        return ServiceMetadata.of(SERVICE_METADATA_ID);
-    }
-
     /**
      * Creates an instance of {@link JsonUtilities} object with the configuration set on this client.
      */
     default JsonUtilities utilities() {
         throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Create a {@link JsonClient} with the region loaded from the
+     * {@link software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain} and credentials loaded from the
+     * {@link software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider}.
+     */
+    static JsonClient create() {
+        return builder().build();
+    }
+
+    /**
+     * Create a builder that can be used to configure and create a {@link JsonClient}.
+     */
+    static JsonClientBuilder builder() {
+        return new DefaultJsonClientBuilder();
+    }
+
+    static ServiceMetadata serviceMetadata() {
+        return ServiceMetadata.of(SERVICE_METADATA_ID);
     }
 }

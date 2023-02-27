@@ -38,9 +38,10 @@ import software.amazon.awssdk.codegen.model.intermediate.Metadata;
 import software.amazon.awssdk.codegen.model.intermediate.OperationModel;
 import software.amazon.awssdk.codegen.model.intermediate.Protocol;
 import software.amazon.awssdk.codegen.model.intermediate.ShapeModel;
-import software.amazon.awssdk.codegen.poet.PoetExtensions;
+import software.amazon.awssdk.codegen.poet.PoetExtension;
 import software.amazon.awssdk.codegen.poet.client.traits.HttpChecksumRequiredTrait;
 import software.amazon.awssdk.codegen.poet.client.traits.HttpChecksumTrait;
+import software.amazon.awssdk.codegen.poet.client.traits.NoneAuthTypeRequestTrait;
 import software.amazon.awssdk.codegen.poet.eventstream.EventStreamUtils;
 import software.amazon.awssdk.codegen.poet.model.EventStreamSpecHelper;
 import software.amazon.awssdk.core.SdkPojoBuilder;
@@ -60,10 +61,10 @@ import software.amazon.awssdk.utils.CompletableFutureUtils;
 
 public class JsonProtocolSpec implements ProtocolSpec {
 
-    private final PoetExtensions poetExtensions;
+    private final PoetExtension poetExtensions;
     private final IntermediateModel model;
 
-    public JsonProtocolSpec(PoetExtensions poetExtensions, IntermediateModel model) {
+    public JsonProtocolSpec(PoetExtension poetExtensions, IntermediateModel model) {
         this.poetExtensions = poetExtensions;
         this.model = model;
     }
@@ -95,13 +96,16 @@ public class JsonProtocolSpec implements ProtocolSpec {
                       .addCode(".protocolVersion($S)\n", metadata.getJsonVersion())
                       .addCode("$L", customErrorCodeFieldName());
 
-
         String contentType = Optional.ofNullable(model.getCustomizationConfig().getCustomServiceMetadata())
                 .map(MetadataConfig::getContentType)
                 .orElse(metadata.getContentType());
 
         if (contentType != null) {
             methodSpec.addCode(".contentType($S)", contentType);
+        }
+
+        if (metadata.getAwsQueryCompatible() != null) {
+            methodSpec.addCode("$L", hasAwsQueryCompatible());
         }
 
         registerModeledExceptions(model, poetExtensions).forEach(methodSpec::addCode);
@@ -114,6 +118,10 @@ public class JsonProtocolSpec implements ProtocolSpec {
         return model.getCustomizationConfig().getCustomErrorCodeFieldName() == null ?
                CodeBlock.builder().build() :
                CodeBlock.of(".customErrorCodeFieldName($S)", model.getCustomizationConfig().getCustomErrorCodeFieldName());
+    }
+
+    private CodeBlock hasAwsQueryCompatible() {
+        return CodeBlock.of(".hasAwsQueryCompatible($L)", model.getMetadata().getAwsQueryCompatible() != null);
     }
 
     private Class<?> protocolFactoryClass() {
@@ -174,10 +182,12 @@ public class JsonProtocolSpec implements ProtocolSpec {
                      .add(".withErrorResponseHandler(errorResponseHandler)\n")
                      .add(hostPrefixExpression(opModel))
                      .add(discoveredEndpoint(opModel))
+                     .add(credentialType(opModel, model))
                      .add(".withInput($L)\n", opModel.getInput().getVariableName())
                      .add(".withMetricCollector(apiCallMetricCollector)")
                      .add(HttpChecksumRequiredTrait.putHttpChecksumAttribute(opModel))
-                     .add(HttpChecksumTrait.create(opModel));
+                     .add(HttpChecksumTrait.create(opModel))
+                     .add(NoneAuthTypeRequestTrait.create(opModel));
 
         if (opModel.hasStreamingInput()) {
             codeBlock.add(".withRequestBody(requestBody)")
@@ -242,9 +252,11 @@ public class JsonProtocolSpec implements ProtocolSpec {
                .add(".withMetricCollector(apiCallMetricCollector)\n")
                .add(hostPrefixExpression(opModel))
                .add(discoveredEndpoint(opModel))
+               .add(credentialType(opModel, model))
                .add(asyncRequestBody)
                .add(HttpChecksumRequiredTrait.putHttpChecksumAttribute(opModel))
                .add(HttpChecksumTrait.create(opModel))
+               .add(NoneAuthTypeRequestTrait.create(opModel))
                .add(".withInput($L)$L);",
                     opModel.getInput().getVariableName(), asyncResponseTransformerVariable(isStreaming, isRestJson, opModel));
 

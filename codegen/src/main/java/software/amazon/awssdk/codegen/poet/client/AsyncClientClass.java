@@ -15,11 +15,14 @@
 
 package software.amazon.awssdk.codegen.poet.client;
 
-import static com.squareup.javapoet.TypeSpec.Builder;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.PROTECTED;
+import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
+import static software.amazon.awssdk.codegen.internal.Constant.EVENT_PUBLISHER_PARAM_NAME;
 import static software.amazon.awssdk.codegen.poet.client.ClientClassUtils.addS3ArnableFieldCode;
 import static software.amazon.awssdk.codegen.poet.client.ClientClassUtils.applyPaginatorUserAgentMethod;
 import static software.amazon.awssdk.codegen.poet.client.ClientClassUtils.applySignerOverrideMethod;
@@ -34,13 +37,15 @@ import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
-import javax.lang.model.element.Modifier;
+import java.util.stream.Stream;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +63,7 @@ import software.amazon.awssdk.codegen.model.intermediate.MemberModel;
 import software.amazon.awssdk.codegen.model.intermediate.OperationModel;
 import software.amazon.awssdk.codegen.model.intermediate.ShapeModel;
 import software.amazon.awssdk.codegen.model.service.AuthType;
-import software.amazon.awssdk.codegen.poet.PoetExtensions;
+import software.amazon.awssdk.codegen.poet.PoetExtension;
 import software.amazon.awssdk.codegen.poet.PoetUtils;
 import software.amazon.awssdk.codegen.poet.StaticImport;
 import software.amazon.awssdk.codegen.poet.client.specs.ProtocolSpec;
@@ -85,7 +90,7 @@ import software.amazon.awssdk.utils.Pair;
 
 public final class AsyncClientClass extends AsyncClientInterface {
     private final IntermediateModel model;
-    private final PoetExtensions poetExtensions;
+    private final PoetExtension poetExtensions;
     private final ClassName className;
     private final ProtocolSpec protocolSpec;
 
@@ -98,66 +103,105 @@ public final class AsyncClientClass extends AsyncClientInterface {
     }
 
     @Override
-    public TypeSpec poetSpec() {
+    protected TypeSpec.Builder createTypeSpec() {
+        return PoetUtils.createClassBuilder(className);
+    }
+
+    @Override
+    protected void addInterfaceClass(TypeSpec.Builder type) {
         ClassName interfaceClass = poetExtensions.getClientClass(model.getMetadata().getAsyncInterface());
-        Builder classBuilder = PoetUtils.createClassBuilder(className);
-        classBuilder.addAnnotation(SdkInternalApi.class)
-                    .addModifiers(Modifier.FINAL)
-                    .addField(FieldSpec.builder(ClassName.get(Logger.class), "log")
-                                       .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
-                                       .initializer("$T.getLogger($T.class)", LoggerFactory.class,
-                                                    className)
-                                       .build())
-                    .addField(AsyncClientHandler.class, "clientHandler", Modifier.PRIVATE, Modifier.FINAL)
-                    .addField(protocolSpec.protocolFactory(model))
-                    .addField(SdkClientConfiguration.class, "clientConfiguration", Modifier.PRIVATE, Modifier.FINAL)
-                    .addSuperinterface(interfaceClass)
-                    .addJavadoc("Internal implementation of {@link $1T}.\n\n@see $1T#builder()",
-                                interfaceClass)
-                    .addMethod(constructor(classBuilder))
-                    .addMethod(nameMethod())
-                    .addMethods(operations())
-                    .addMethod(closeMethod())
-                    .addMethods(protocolSpec.additionalMethods())
-                    .addMethod(protocolSpec.initProtocolFactory(model))
-                    .addMethod(resolveMetricPublishersMethod());
+        type.addSuperinterface(interfaceClass)
+            .addJavadoc("Internal implementation of {@link $1T}.\n\n@see $1T#builder()", interfaceClass);
+    }
+
+    @Override
+    protected void addAnnotations(TypeSpec.Builder type) {
+        type.addAnnotation(SdkInternalApi.class);
+    }
+
+    @Override
+    protected void addModifiers(TypeSpec.Builder type) {
+        type.addModifiers(FINAL);
+    }
+
+    @Override
+    protected void addFields(TypeSpec.Builder type) {
+        type.addField(FieldSpec.builder(ClassName.get(Logger.class), "log")
+                               .addModifiers(PRIVATE, STATIC, FINAL)
+                               .initializer("$T.getLogger($T.class)", LoggerFactory.class,
+                                            className)
+                               .build())
+            .addField(AsyncClientHandler.class, "clientHandler", PRIVATE, FINAL)
+            .addField(protocolSpec.protocolFactory(model))
+            .addField(SdkClientConfiguration.class, "clientConfiguration", PRIVATE, FINAL);
 
         // Kinesis doesn't support CBOR for STS yet so need another protocol factory for JSON
         if (model.getMetadata().isCborProtocol()) {
-            classBuilder.addField(AwsJsonProtocolFactory.class, "jsonProtocolFactory", Modifier.PRIVATE, Modifier.FINAL);
-        }
-
-        if (model.hasPaginators()) {
-            classBuilder.addMethod(applyPaginatorUserAgentMethod(poetExtensions, model));
-        }
-
-        if (model.containsRequestSigners() || model.containsRequestEventStreams() || hasStreamingV4AuthOperations()) {
-            classBuilder.addMethod(applySignerOverrideMethod(poetExtensions, model));
-            classBuilder.addMethod(isSignerOverriddenOnClientMethod());
-        }
-
-        if (model.getCustomizationConfig().getUtilitiesMethod() != null) {
-            classBuilder.addMethod(utilitiesMethod());
+            type.addField(AwsJsonProtocolFactory.class, "jsonProtocolFactory", PRIVATE, FINAL);
         }
 
         model.getEndpointOperation().ifPresent(
-            o -> classBuilder.addField(EndpointDiscoveryRefreshCache.class, "endpointDiscoveryCache", PRIVATE));
-
-        protocolSpec.createErrorResponseHandler().ifPresent(classBuilder::addMethod);
-
-        if (model.hasWaiters()) {
-            classBuilder.addField(FieldSpec.builder(ClassName.get(ScheduledExecutorService.class), "executorService")
-                                                   .addModifiers(PRIVATE, FINAL)
-                                                   .build());
-            classBuilder.addMethod(waiterImplMethod());
-        }
-
-        return classBuilder.build();
+            o -> type.addField(EndpointDiscoveryRefreshCache.class, "endpointDiscoveryCache", PRIVATE));
     }
 
-    private MethodSpec constructor(Builder classBuilder) {
+    @Override
+    protected void addAdditionalMethods(TypeSpec.Builder type) {
+        type.addMethod(constructor(type))
+            .addMethod(nameMethod())
+            .addMethods(protocolSpec.additionalMethods())
+            .addMethod(protocolSpec.initProtocolFactory(model))
+            .addMethod(resolveMetricPublishersMethod());
+
+        if (model.hasPaginators()) {
+            type.addMethod(applyPaginatorUserAgentMethod(poetExtensions, model));
+        }
+
+        if (model.containsRequestSigners() || model.containsRequestEventStreams() || hasStreamingV4AuthOperations()) {
+            type.addMethod(applySignerOverrideMethod(poetExtensions, model));
+            type.addMethod(isSignerOverriddenOnClientMethod());
+        }
+
+        protocolSpec.createErrorResponseHandler().ifPresent(type::addMethod);
+    }
+
+    @Override
+    protected void addWaiterMethod(TypeSpec.Builder type) {
+        type.addField(FieldSpec.builder(ClassName.get(ScheduledExecutorService.class), "executorService")
+                                       .addModifiers(PRIVATE, FINAL)
+                                       .build());
+
+        MethodSpec waiter = MethodSpec.methodBuilder("waiter")
+                                      .addModifiers(PUBLIC)
+                                      .addAnnotation(Override.class)
+                                      .addStatement("return $T.builder().client(this)"
+                                                    + ".scheduledExecutorService(executorService).build()",
+                                                    poetExtensions.getAsyncWaiterInterface())
+                                      .returns(poetExtensions.getAsyncWaiterInterface())
+                                      .build();
+
+        type.addMethod(waiter);
+    }
+
+    @Override
+    protected List<MethodSpec> operations() {
+        return model.getOperations().values().stream()
+                    .flatMap(this::operations)
+                    .sorted(Comparator.comparing(m -> m.name))
+                    .collect(toList());
+    }
+
+    private Stream<MethodSpec> operations(OperationModel opModel) {
+        List<MethodSpec> methods = new ArrayList<>();
+        methods.add(traditionalMethod(opModel));
+        if (opModel.isPaginated()) {
+            methods.add(paginatedTraditionalMethod(opModel));
+        }
+        return methods.stream();
+    }
+
+    private MethodSpec constructor(TypeSpec.Builder classBuilder) {
         MethodSpec.Builder builder = MethodSpec.constructorBuilder()
-                                               .addModifiers(Modifier.PROTECTED)
+                                               .addModifiers(PROTECTED)
                                                .addParameter(SdkClientConfiguration.class, "clientConfiguration")
                                                .addStatement("this.clientHandler = new $T(clientConfiguration)",
                                                              AwsAsyncClientHandler.class)
@@ -173,8 +217,7 @@ public final class AsyncClientClass extends AsyncClientInterface {
             builder.addStatement("this.jsonProtocolFactory = init($T.builder()).build()", AwsJsonProtocolFactory.class);
         }
         if (hasOperationWithEventStreamOutput()) {
-            classBuilder.addField(FieldSpec.builder(ClassName.get(Executor.class), "executor",
-                                                    Modifier.PRIVATE, Modifier.FINAL)
+            classBuilder.addField(FieldSpec.builder(ClassName.get(Executor.class), "executor", PRIVATE, FINAL)
                                            .build());
             builder.addStatement("this.executor = clientConfiguration.option($T.FUTURE_COMPLETION_EXECUTOR)",
                                  SdkAdvancedAsyncClientOption.class);
@@ -215,24 +258,27 @@ public final class AsyncClientClass extends AsyncClientInterface {
     private MethodSpec nameMethod() {
         return MethodSpec.methodBuilder("serviceName")
                          .addAnnotation(Override.class)
-                         .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+                         .addModifiers(PUBLIC, FINAL)
                          .returns(String.class)
                          .addStatement("return SERVICE_NAME")
                          .build();
     }
 
-    private MethodSpec closeMethod() {
-        return MethodSpec.methodBuilder("close")
-                         .addAnnotation(Override.class)
-                         .addModifiers(Modifier.PUBLIC)
-                         .addStatement("$N.close()", "clientHandler")
-                         .build();
+    @Override
+    protected void addCloseMethod(TypeSpec.Builder type) {
+        MethodSpec method = MethodSpec.methodBuilder("close")
+                                      .addAnnotation(Override.class)
+                                      .addModifiers(PUBLIC)
+                                      .addStatement("$N.close()", "clientHandler")
+                                      .build();
+
+        type.addMethod(method);
     }
 
     @Override
     protected MethodSpec.Builder operationBody(MethodSpec.Builder builder, OperationModel opModel) {
 
-        builder.addModifiers(Modifier.PUBLIC)
+        builder.addModifiers(PUBLIC)
                .addAnnotation(Override.class);
 
         builder.addStatement("$T<$T> metricPublishers = "
@@ -361,7 +407,7 @@ public final class AsyncClientClass extends AsyncClientInterface {
 
     @Override
     protected MethodSpec.Builder paginatedMethodBody(MethodSpec.Builder builder, OperationModel opModel) {
-        return builder.addModifiers(Modifier.PUBLIC)
+        return builder.addModifiers(PUBLIC)
                       .addStatement("return new $T(this, applyPaginatorUserAgent($L))",
                                     poetExtensions.getResponseClassForPaginatedAsyncOperation(opModel.getOperationName()),
                                     opModel.getInput().getVariableName());
@@ -420,7 +466,8 @@ public final class AsyncClientClass extends AsyncClientInterface {
         return poetExtensions.getModelClass(shapeModel.getShapeName());
     }
 
-    private MethodSpec utilitiesMethod() {
+    @Override
+    protected MethodSpec utilitiesMethod() {
         UtilitiesMethod config = model.getCustomizationConfig().getUtilitiesMethod();
         ClassName returnType = PoetUtils.classNameFromFqcn(config.getReturnType());
         String instanceClass = config.getInstanceType();
@@ -432,22 +479,11 @@ public final class AsyncClientClass extends AsyncClientInterface {
 
         return MethodSpec.methodBuilder(UtilitiesMethod.METHOD_NAME)
                          .returns(returnType)
-                         .addModifiers(Modifier.PUBLIC)
+                         .addModifiers(PUBLIC)
                          .addAnnotation(Override.class)
                          .addStatement("return $T.create($L)",
                                        instanceType,
                                        String.join(",", config.getCreateMethodParams()))
-                         .build();
-    }
-
-    private MethodSpec waiterImplMethod() {
-        return MethodSpec.methodBuilder("waiter")
-                         .addModifiers(Modifier.PUBLIC)
-                         .addAnnotation(Override.class)
-                         .addStatement("return $T.builder().client(this)"
-                                       + ".scheduledExecutorService(executorService).build()",
-                                       poetExtensions.getAsyncWaiterInterface())
-                         .returns(poetExtensions.getAsyncWaiterInterface())
                          .build();
     }
 

@@ -141,7 +141,8 @@
         {"shape":"AuthorizationQuotaExceededFault"},
         {"shape":"DependentServiceRequestThrottlingFault"},
         {"shape":"InvalidClusterSnapshotStateFault"},
-        {"shape":"LimitExceededFault"}
+        {"shape":"LimitExceededFault"},
+        {"shape":"UnsupportedOperationFault"}
       ],
       "documentation":"<p>Authorizes the specified Amazon Web Services account to restore the specified snapshot.</p> <p> For more information about working with snapshots, go to <a href=\"https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-snapshots.html\">Amazon Redshift Snapshots</a> in the <i>Amazon Redshift Cluster Management Guide</i>.</p>"
     },
@@ -907,7 +908,8 @@
       "errors":[
         {"shape":"ClusterNotFoundFault"},
         {"shape":"ClusterSnapshotNotFoundFault"},
-        {"shape":"InvalidTagFault"}
+        {"shape":"InvalidTagFault"},
+        {"shape":"UnsupportedOperationFault"}
       ],
       "documentation":"<p>Returns one or more snapshot objects, which contain metadata about your cluster snapshots. By default, this operation returns information about all snapshots of all clusters that are owned by your Amazon Web Services account. No information is returned for snapshots owned by inactive Amazon Web Services accounts.</p> <p>If you specify both tag keys and tag values in the same request, Amazon Redshift returns all snapshots that match any combination of the specified keys and values. For example, if you have <code>owner</code> and <code>environment</code> for tag keys, and <code>admin</code> and <code>test</code> for tag values, all snapshots that have any combination of those values are returned. Only snapshots that you own are returned in the response; shared snapshots are not returned with the tag key and tag value request parameters.</p> <p>If both tag keys and values are omitted from the request, snapshots are returned regardless of whether they have tag keys or values associated with them.</p>"
     },
@@ -1179,7 +1181,8 @@
         {"shape":"ClusterSnapshotNotFoundFault"},
         {"shape":"InvalidClusterSnapshotStateFault"},
         {"shape":"ClusterNotFoundFault"},
-        {"shape":"AccessToSnapshotDeniedFault"}
+        {"shape":"AccessToSnapshotDeniedFault"},
+        {"shape":"UnsupportedOperationFault"}
       ],
       "documentation":"<p>Returns properties of possible node configurations such as node type, number of nodes, and disk usage for the specified action type.</p>"
     },
@@ -1510,6 +1513,23 @@
       ],
       "documentation":"<p>Returns a database user name and temporary password with temporary authorization to log on to an Amazon Redshift database. The action returns the database user name prefixed with <code>IAM:</code> if <code>AutoCreate</code> is <code>False</code> or <code>IAMA:</code> if <code>AutoCreate</code> is <code>True</code>. You can optionally specify one or more database user groups that the user will join at log on. By default, the temporary credentials expire in 900 seconds. You can optionally specify a duration between 900 seconds (15 minutes) and 3600 seconds (60 minutes). For more information, see <a href=\"https://docs.aws.amazon.com/redshift/latest/mgmt/generating-user-credentials.html\">Using IAM Authentication to Generate Database User Credentials</a> in the Amazon Redshift Cluster Management Guide.</p> <p>The Identity and Access Management (IAM) user or role that runs GetClusterCredentials must have an IAM policy attached that allows access to all necessary actions and resources. For more information about permissions, see <a href=\"https://docs.aws.amazon.com/redshift/latest/mgmt/redshift-iam-access-control-identity-based.html#redshift-policy-resources.getclustercredentials-resources\">Resource Policies for GetClusterCredentials</a> in the Amazon Redshift Cluster Management Guide.</p> <p>If the <code>DbGroups</code> parameter is specified, the IAM policy must allow the <code>redshift:JoinGroup</code> action with access to the listed <code>dbgroups</code>. </p> <p>In addition, if the <code>AutoCreate</code> parameter is set to <code>True</code>, then the policy must include the <code>redshift:CreateClusterUser</code> permission.</p> <p>If the <code>DbName</code> parameter is specified, the IAM policy must allow access to the resource <code>dbname</code> for the specified database name. </p>"
     },
+    "GetClusterCredentialsWithIAM":{
+      "name":"GetClusterCredentialsWithIAM",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"GetClusterCredentialsWithIAMMessage"},
+      "output":{
+        "shape":"ClusterExtendedCredentials",
+        "resultWrapper":"GetClusterCredentialsWithIAMResult"
+      },
+      "errors":[
+        {"shape":"ClusterNotFoundFault"},
+        {"shape":"UnsupportedOperationFault"}
+      ],
+      "documentation":"<p>Returns a database user name and temporary password with temporary authorization to log in to an Amazon Redshift database. The database user is mapped 1:1 to the source Identity and Access Management (IAM) identity. For more information about IAM identities, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/id.html\">IAM Identities (users, user groups, and roles)</a> in the Amazon Web Services Identity and Access Management User Guide.</p> <p>The Identity and Access Management (IAM) identity that runs this operation must have an IAM policy attached that allows access to all necessary actions and resources. For more information about permissions, see <a href=\"https://docs.aws.amazon.com/redshift/latest/mgmt/redshift-iam-access-control-identity-based.html\">Using identity-based policies (IAM policies)</a> in the Amazon Redshift Cluster Management Guide. </p>"
+    },
     "GetReservedNodeExchangeConfigurationOptions":{
       "name":"GetReservedNodeExchangeConfigurationOptions",
       "http":{
@@ -1570,7 +1590,7 @@
         {"shape":"InvalidClusterStateFault"},
         {"shape":"UnsupportedOperationFault"}
       ],
-      "documentation":"<p>Modifies whether a cluster can use AQUA (Advanced Query Accelerator). </p>"
+      "documentation":"<p>This operation is retired. Calling this operation does not change AQUA configuration. Amazon Redshift automatically determines whether to use AQUA (Advanced Query Accelerator). </p>"
     },
     "ModifyAuthenticationProfile":{
       "name":"ModifyAuthenticationProfile",
@@ -2050,7 +2070,7 @@
         {"shape":"InvalidClusterStateFault"},
         {"shape":"UnsupportedOperationFault"}
       ],
-      "documentation":"<p>Creates a new table from a table in an Amazon Redshift cluster snapshot. You must create the new table within the Amazon Redshift cluster that the snapshot was taken from.</p> <p>You cannot use <code>RestoreTableFromClusterSnapshot</code> to restore a table with the same name as an existing table in an Amazon Redshift cluster. That is, you cannot overwrite an existing table in a cluster with a restored table. If you want to replace your original table with a new, restored table, then rename or drop your original table before you call <code>RestoreTableFromClusterSnapshot</code>. When you have renamed your original table, then you can pass the original name of the table as the <code>NewTableName</code> parameter value in the call to <code>RestoreTableFromClusterSnapshot</code>. This way, you can replace the original table with the table created from the snapshot.</p>"
+      "documentation":"<p>Creates a new table from a table in an Amazon Redshift cluster snapshot. You must create the new table within the Amazon Redshift cluster that the snapshot was taken from.</p> <p>You cannot use <code>RestoreTableFromClusterSnapshot</code> to restore a table with the same name as an existing table in an Amazon Redshift cluster. That is, you cannot overwrite an existing table in a cluster with a restored table. If you want to replace your original table with a new, restored table, then rename or drop your original table before you call <code>RestoreTableFromClusterSnapshot</code>. When you have renamed your original table, then you can pass the original name of the table as the <code>NewTableName</code> parameter value in the call to <code>RestoreTableFromClusterSnapshot</code>. This way, you can replace the original table with the table created from the snapshot.</p> <p>You can't use this operation to restore tables with <a href=\"https://docs.aws.amazon.com/redshift/latest/dg/t_Sorting_data.html#t_Sorting_data-interleaved\">interleaved sort keys</a>.</p>"
     },
     "ResumeCluster":{
       "name":"ResumeCluster",
@@ -2124,7 +2144,8 @@
       "errors":[
         {"shape":"AccessToSnapshotDeniedFault"},
         {"shape":"AuthorizationNotFoundFault"},
-        {"shape":"ClusterSnapshotNotFoundFault"}
+        {"shape":"ClusterSnapshotNotFoundFault"},
+        {"shape":"UnsupportedOperationFault"}
       ],
       "documentation":"<p>Removes the ability of the specified Amazon Web Services account to restore the specified snapshot. If the account is currently restoring the snapshot, the restore will run to completion.</p> <p> For more information about working with snapshots, go to <a href=\"https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-snapshots.html\">Amazon Redshift Snapshots</a> in the <i>Amazon Redshift Cluster Management Guide</i>.</p>"
     },
@@ -2273,14 +2294,14 @@
       "members":{
         "AquaStatus":{
           "shape":"AquaStatus",
-          "documentation":"<p>The value indicates the status of AQUA on the cluster. Possible values include the following.</p> <ul> <li> <p>enabled - AQUA is enabled.</p> </li> <li> <p>disabled - AQUA is not enabled. </p> </li> <li> <p>applying - AQUA status is being applied. </p> </li> </ul>"
+          "documentation":"<p>This field is retired. Amazon Redshift automatically determines whether to use AQUA (Advanced Query Accelerator).</p>"
         },
         "AquaConfigurationStatus":{
           "shape":"AquaConfigurationStatus",
-          "documentation":"<p>The value represents how the cluster is configured to use AQUA. Possible values include the following.</p> <ul> <li> <p>enabled - Use AQUA if it is available for the current Amazon Web Services Region and Amazon Redshift node type.</p> </li> <li> <p>disabled - Don't use AQUA. </p> </li> <li> <p>auto - Amazon Redshift determines whether to use AQUA.</p> </li> </ul>"
+          "documentation":"<p>This field is retired. Amazon Redshift automatically determines whether to use AQUA (Advanced Query Accelerator).</p>"
         }
       },
-      "documentation":"<p>The AQUA (Advanced Query Accelerator) configuration of the cluster.</p>"
+      "documentation":"<p>The operation that uses this structure is retired. Amazon Redshift automatically determines whether to use AQUA (Advanced Query Accelerator).</p>"
     },
     "AquaConfigurationStatus":{
       "type":"string",
@@ -2526,18 +2547,19 @@
     },
     "AuthorizeSnapshotAccessMessage":{
       "type":"structure",
-      "required":[
-        "SnapshotIdentifier",
-        "AccountWithRestoreAccess"
-      ],
+      "required":["AccountWithRestoreAccess"],
       "members":{
         "SnapshotIdentifier":{
           "shape":"String",
           "documentation":"<p>The identifier of the snapshot the account is authorized to restore.</p>"
         },
+        "SnapshotArn":{
+          "shape":"String",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the snapshot to authorize access to.</p>"
+        },
         "SnapshotClusterIdentifier":{
           "shape":"String",
-          "documentation":"<p>The identifier of the cluster the snapshot was created from. This parameter is required if your IAM user has a policy containing a snapshot resource element that specifies anything other than * for the cluster name.</p>"
+          "documentation":"<p>The identifier of the cluster the snapshot was created from. This parameter is required if your IAM user or role has a policy containing a snapshot resource element that specifies anything other than * for the cluster name.</p>"
         },
         "AccountWithRestoreAccess":{
           "shape":"String",
@@ -2891,7 +2913,7 @@
         },
         "AquaConfiguration":{
           "shape":"AquaConfiguration",
-          "documentation":"<p>The AQUA (Advanced Query Accelerator) configuration of the cluster.</p>"
+          "documentation":"<p>This field is retired. Amazon Redshift automatically determines whether to use AQUA (Advanced Query Accelerator).</p>"
         },
         "DefaultIamRoleArn":{
           "shape":"String",
@@ -2988,6 +3010,27 @@
         "ClusterDbRevisions":{
           "shape":"ClusterDbRevisionsList",
           "documentation":"<p>A list of revisions.</p>"
+        }
+      }
+    },
+    "ClusterExtendedCredentials":{
+      "type":"structure",
+      "members":{
+        "DbUser":{
+          "shape":"String",
+          "documentation":"<p>A database user name that you provide when you connect to a database. The database user is mapped 1:1 to the source IAM identity. </p>"
+        },
+        "DbPassword":{
+          "shape":"SensitiveString",
+          "documentation":"<p>A temporary password that you provide when you connect to a database.</p>"
+        },
+        "Expiration":{
+          "shape":"TStamp",
+          "documentation":"<p>The time (UTC) when the temporary password expires. After this timestamp, a log in with the temporary password fails.</p>"
+        },
+        "NextRefreshTime":{
+          "shape":"TStamp",
+          "documentation":"<p>Reserved for future use.</p>"
         }
       }
     },
@@ -3561,7 +3604,7 @@
         },
         "SourceSnapshotClusterIdentifier":{
           "shape":"String",
-          "documentation":"<p>The identifier of the cluster the source snapshot was created from. This parameter is required if your IAM user has a policy containing a snapshot resource element that specifies anything other than * for the cluster name.</p> <p>Constraints:</p> <ul> <li> <p>Must be the identifier for a valid cluster.</p> </li> </ul>"
+          "documentation":"<p>The identifier of the cluster the source snapshot was created from. This parameter is required if your IAM user or role has a policy containing a snapshot resource element that specifies anything other than * for the cluster name.</p> <p>Constraints:</p> <ul> <li> <p>Must be the identifier for a valid cluster.</p> </li> </ul>"
         },
         "TargetSnapshotIdentifier":{
           "shape":"String",
@@ -3649,11 +3692,11 @@
         },
         "MasterUsername":{
           "shape":"String",
-          "documentation":"<p>The user name associated with the admin user account for the cluster that is being created.</p> <p>Constraints:</p> <ul> <li> <p>Must be 1 - 128 alphanumeric characters. The user name can't be <code>PUBLIC</code>.</p> </li> <li> <p>First character must be a letter.</p> </li> <li> <p>Cannot be a reserved word. A list of reserved words can be found in <a href=\"https://docs.aws.amazon.com/redshift/latest/dg/r_pg_keywords.html\">Reserved Words</a> in the Amazon Redshift Database Developer Guide. </p> </li> </ul>"
+          "documentation":"<p>The user name associated with the admin user for the cluster that is being created.</p> <p>Constraints:</p> <ul> <li> <p>Must be 1 - 128 alphanumeric characters or hyphens. The user name can't be <code>PUBLIC</code>.</p> </li> <li> <p>Must contain only lowercase letters, numbers, underscore, plus sign, period (dot), at symbol (@), or hyphen.</p> </li> <li> <p>The first character must be a letter.</p> </li> <li> <p>Must not contain a colon (:) or a slash (/).</p> </li> <li> <p>Cannot be a reserved word. A list of reserved words can be found in <a href=\"https://docs.aws.amazon.com/redshift/latest/dg/r_pg_keywords.html\">Reserved Words</a> in the Amazon Redshift Database Developer Guide. </p> </li> </ul>"
         },
         "MasterUserPassword":{
           "shape":"String",
-          "documentation":"<p>The password associated with the admin user account for the cluster that is being created.</p> <p>Constraints:</p> <ul> <li> <p>Must be between 8 and 64 characters in length.</p> </li> <li> <p>Must contain at least one uppercase letter.</p> </li> <li> <p>Must contain at least one lowercase letter.</p> </li> <li> <p>Must contain one number.</p> </li> <li> <p>Can be any printable ASCII character (ASCII code 33-126) except ' (single quote), \" (double quote), \\, /, or @.</p> </li> </ul>"
+          "documentation":"<p>The password associated with the admin user for the cluster that is being created.</p> <p>Constraints:</p> <ul> <li> <p>Must be between 8 and 64 characters in length.</p> </li> <li> <p>Must contain at least one uppercase letter.</p> </li> <li> <p>Must contain at least one lowercase letter.</p> </li> <li> <p>Must contain one number.</p> </li> <li> <p>Can be any printable ASCII character (ASCII code 33-126) except <code>'</code> (single quote), <code>\"</code> (double quote), <code>\\</code>, <code>/</code>, or <code>@</code>.</p> </li> </ul>"
         },
         "ClusterSecurityGroups":{
           "shape":"ClusterSecurityGroupNameList",
@@ -3721,7 +3764,7 @@
         },
         "ElasticIp":{
           "shape":"String",
-          "documentation":"<p>The Elastic IP (EIP) address for the cluster.</p> <p>Constraints: The cluster must be provisioned in EC2-VPC and publicly-accessible through an Internet gateway. For more information about provisioning clusters in EC2-VPC, go to <a href=\"https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-clusters.html#cluster-platforms\">Supported Platforms to Launch Your Cluster</a> in the Amazon Redshift Cluster Management Guide.</p>"
+          "documentation":"<p>The Elastic IP (EIP) address for the cluster.</p> <p>Constraints: The cluster must be provisioned in EC2-VPC and publicly-accessible through an Internet gateway. Don't specify the Elastic IP address for a publicly accessible cluster with availability zone relocation turned on. For more information about provisioning clusters in EC2-VPC, go to <a href=\"https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-clusters.html#cluster-platforms\">Supported Platforms to Launch Your Cluster</a> in the Amazon Redshift Cluster Management Guide.</p>"
         },
         "Tags":{
           "shape":"TagList",
@@ -3757,7 +3800,7 @@
         },
         "AquaConfigurationStatus":{
           "shape":"AquaConfigurationStatus",
-          "documentation":"<p>The value represents how the cluster is configured to use AQUA (Advanced Query Accelerator) when it is created. Possible values include the following.</p> <ul> <li> <p>enabled - Use AQUA if it is available for the current Amazon Web Services Region and Amazon Redshift node type.</p> </li> <li> <p>disabled - Don't use AQUA. </p> </li> <li> <p>auto - Amazon Redshift determines whether to use AQUA.</p> </li> </ul>"
+          "documentation":"<p>This parameter is retired. It does not set the AQUA configuration status. Amazon Redshift automatically determines whether to use AQUA (Advanced Query Accelerator).</p>"
         },
         "DefaultIamRoleArn":{
           "shape":"String",
@@ -4480,7 +4523,7 @@
         },
         "SnapshotClusterIdentifier":{
           "shape":"String",
-          "documentation":"<p>The unique identifier of the cluster the snapshot was created from. This parameter is required if your IAM user has a policy containing a snapshot resource element that specifies anything other than * for the cluster name.</p> <p>Constraints: Must be the name of valid cluster.</p>"
+          "documentation":"<p>The unique identifier of the cluster the snapshot was created from. This parameter is required if your IAM user or role has a policy containing a snapshot resource element that specifies anything other than * for the cluster name.</p> <p>Constraints: Must be the name of valid cluster.</p>"
         }
       },
       "documentation":"<p/>"
@@ -4733,7 +4776,7 @@
       "members":{
         "ClusterSecurityGroupName":{
           "shape":"String",
-          "documentation":"<p>The name of a cluster security group for which you are requesting details. You can specify either the <b>Marker</b> parameter or a <b>ClusterSecurityGroupName</b> parameter, but not both. </p> <p> Example: <code>securitygroup1</code> </p>"
+          "documentation":"<p>The name of a cluster security group for which you are requesting details. You must specify either the <b>Marker</b> parameter or a <b>ClusterSecurityGroupName</b> parameter, but not both. </p> <p> Example: <code>securitygroup1</code> </p>"
         },
         "MaxRecords":{
           "shape":"IntegerOptional",
@@ -4741,7 +4784,7 @@
         },
         "Marker":{
           "shape":"String",
-          "documentation":"<p>An optional parameter that specifies the starting point to return a set of response records. When the results of a <a>DescribeClusterSecurityGroups</a> request exceed the value specified in <code>MaxRecords</code>, Amazon Web Services returns a value in the <code>Marker</code> field of the response. You can retrieve the next set of response records by providing the returned marker value in the <code>Marker</code> parameter and retrying the request. </p> <p>Constraints: You can specify either the <b>ClusterSecurityGroupName</b> parameter or the <b>Marker</b> parameter, but not both. </p>"
+          "documentation":"<p>An optional parameter that specifies the starting point to return a set of response records. When the results of a <a>DescribeClusterSecurityGroups</a> request exceed the value specified in <code>MaxRecords</code>, Amazon Web Services returns a value in the <code>Marker</code> field of the response. You can retrieve the next set of response records by providing the returned marker value in the <code>Marker</code> parameter and retrying the request. </p> <p>Constraints: You must specify either the <b>ClusterSecurityGroupName</b> parameter or the <b>Marker</b> parameter, but not both. </p>"
         },
         "TagKeys":{
           "shape":"TagKeyList",
@@ -4765,6 +4808,10 @@
           "shape":"String",
           "documentation":"<p>The snapshot identifier of the snapshot about which to return information.</p>"
         },
+        "SnapshotArn":{
+          "shape":"String",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the snapshot associated with the message to describe cluster snapshots.</p>"
+        },
         "SnapshotType":{
           "shape":"String",
           "documentation":"<p>The type of snapshots for which you are requesting information. By default, snapshots of all types are returned.</p> <p>Valid Values: <code>automated</code> | <code>manual</code> </p>"
@@ -4779,7 +4826,7 @@
         },
         "MaxRecords":{
           "shape":"IntegerOptional",
-          "documentation":"<p>The maximum number of response records to return in each call. If the number of remaining response records exceeds the specified <code>MaxRecords</code> value, a value is returned in a <code>marker</code> field of the response. You can retrieve the next set of records by retrying the command with the returned marker value. </p> <p>Default: <code>100</code> </p> <p>Constraints: minimum 20, maximum 100.</p>"
+          "documentation":"<p>The maximum number of response records to return in each call. If the number of remaining response records exceeds the specified <code>MaxRecords</code> value, a value is returned in a <code>marker</code> field of the response. You can retrieve the next set of records by retrying the command with the returned marker value. </p> <p>Default: <code>100</code> </p> <p>Constraints: minimum 20, maximum 500.</p>"
         },
         "Marker":{
           "shape":"String",
@@ -5060,7 +5107,7 @@
         },
         "Account":{
           "shape":"String",
-          "documentation":"<p>The AAmazon Web Services account ID of either the cluster owner (grantor) or grantee. If <code>Grantee</code> parameter is true, then the <code>Account</code> value is of the grantor.</p>"
+          "documentation":"<p>The Amazon Web Services account ID of either the cluster owner (grantor) or grantee. If <code>Grantee</code> parameter is true, then the <code>Account</code> value is of the grantor.</p>"
         },
         "Grantee":{
           "shape":"BooleanOptional",
@@ -5224,6 +5271,10 @@
         "SnapshotIdentifier":{
           "shape":"String",
           "documentation":"<p>The identifier of the snapshot to evaluate for possible node configurations.</p>"
+        },
+        "SnapshotArn":{
+          "shape":"String",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the snapshot associated with the message to describe node configuration.</p>"
         },
         "OwnerAccount":{
           "shape":"String",
@@ -5695,7 +5746,7 @@
         },
         "LogExports":{
           "shape":"LogTypeList",
-          "documentation":"<p>The collection of exported log types. Log types include the connection log, user log and user activity log.</p>"
+          "documentation":"<p>The collection of exported log types. Possible values are <code>connectionlog</code>, <code>useractivitylog</code>, and <code>userlog</code>.</p>"
         }
       },
       "documentation":"<p/>"
@@ -6174,15 +6225,15 @@
       "members":{
         "DbUser":{
           "shape":"String",
-          "documentation":"<p>The name of a database user. If a user name matching <code>DbUser</code> exists in the database, the temporary user credentials have the same permissions as the existing user. If <code>DbUser</code> doesn't exist in the database and <code>Autocreate</code> is <code>True</code>, a new user is created using the value for <code>DbUser</code> with PUBLIC permissions. If a database user matching the value for <code>DbUser</code> doesn't exist and <code>Autocreate</code> is <code>False</code>, then the command succeeds but the connection attempt will fail because the user doesn't exist in the database.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/redshift/latest/dg/r_CREATE_USER.html\">CREATE USER</a> in the Amazon Redshift Database Developer Guide. </p> <p>Constraints:</p> <ul> <li> <p>Must be 1 to 64 alphanumeric characters or hyphens. The user name can't be <code>PUBLIC</code>.</p> </li> <li> <p>Must contain only lowercase letters, numbers, underscore, plus sign, period (dot), at symbol (@), or hyphen.</p> </li> <li> <p>First character must be a letter.</p> </li> <li> <p>Must not contain a colon ( : ) or slash ( / ). </p> </li> <li> <p>Cannot be a reserved word. A list of reserved words can be found in <a href=\"http://docs.aws.amazon.com/redshift/latest/dg/r_pg_keywords.html\">Reserved Words</a> in the Amazon Redshift Database Developer Guide.</p> </li> </ul>"
+          "documentation":"<p>The name of a database user. If a user name matching <code>DbUser</code> exists in the database, the temporary user credentials have the same permissions as the existing user. If <code>DbUser</code> doesn't exist in the database and <code>Autocreate</code> is <code>True</code>, a new user is created using the value for <code>DbUser</code> with PUBLIC permissions. If a database user matching the value for <code>DbUser</code> doesn't exist and <code>Autocreate</code> is <code>False</code>, then the command succeeds but the connection attempt will fail because the user doesn't exist in the database.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/redshift/latest/dg/r_CREATE_USER.html\">CREATE USER</a> in the Amazon Redshift Database Developer Guide. </p> <p>Constraints:</p> <ul> <li> <p>Must be 1 to 64 alphanumeric characters or hyphens. The user name can't be <code>PUBLIC</code>.</p> </li> <li> <p>Must contain uppercase or lowercase letters, numbers, underscore, plus sign, period (dot), at symbol (@), or hyphen.</p> </li> <li> <p>First character must be a letter.</p> </li> <li> <p>Must not contain a colon ( : ) or slash ( / ). </p> </li> <li> <p>Cannot be a reserved word. A list of reserved words can be found in <a href=\"http://docs.aws.amazon.com/redshift/latest/dg/r_pg_keywords.html\">Reserved Words</a> in the Amazon Redshift Database Developer Guide.</p> </li> </ul>"
         },
         "DbName":{
           "shape":"String",
-          "documentation":"<p>The name of a database that <code>DbUser</code> is authorized to log on to. If <code>DbName</code> is not specified, <code>DbUser</code> can log on to any existing database.</p> <p>Constraints:</p> <ul> <li> <p>Must be 1 to 64 alphanumeric characters or hyphens</p> </li> <li> <p>Must contain only lowercase letters, numbers, underscore, plus sign, period (dot), at symbol (@), or hyphen.</p> </li> <li> <p>First character must be a letter.</p> </li> <li> <p>Must not contain a colon ( : ) or slash ( / ). </p> </li> <li> <p>Cannot be a reserved word. A list of reserved words can be found in <a href=\"http://docs.aws.amazon.com/redshift/latest/dg/r_pg_keywords.html\">Reserved Words</a> in the Amazon Redshift Database Developer Guide.</p> </li> </ul>"
+          "documentation":"<p>The name of a database that <code>DbUser</code> is authorized to log on to. If <code>DbName</code> is not specified, <code>DbUser</code> can log on to any existing database.</p> <p>Constraints:</p> <ul> <li> <p>Must be 1 to 64 alphanumeric characters or hyphens</p> </li> <li> <p>Must contain uppercase or lowercase letters, numbers, underscore, plus sign, period (dot), at symbol (@), or hyphen.</p> </li> <li> <p>First character must be a letter.</p> </li> <li> <p>Must not contain a colon ( : ) or slash ( / ). </p> </li> <li> <p>Cannot be a reserved word. A list of reserved words can be found in <a href=\"http://docs.aws.amazon.com/redshift/latest/dg/r_pg_keywords.html\">Reserved Words</a> in the Amazon Redshift Database Developer Guide.</p> </li> </ul>"
         },
         "ClusterIdentifier":{
           "shape":"String",
-          "documentation":"<p>The unique identifier of the cluster that contains the database for which your are requesting credentials. This parameter is case sensitive.</p>"
+          "documentation":"<p>The unique identifier of the cluster that contains the database for which you are requesting credentials. This parameter is case sensitive.</p>"
         },
         "DurationSeconds":{
           "shape":"IntegerOptional",
@@ -6198,6 +6249,24 @@
         }
       },
       "documentation":"<p>The request parameters to get cluster credentials.</p>"
+    },
+    "GetClusterCredentialsWithIAMMessage":{
+      "type":"structure",
+      "required":["ClusterIdentifier"],
+      "members":{
+        "DbName":{
+          "shape":"String",
+          "documentation":"<p>The name of the database for which you are requesting credentials. If the database name is specified, the IAM policy must allow access to the resource <code>dbname</code> for the specified database name. If the database name is not specified, access to all databases is allowed.</p>"
+        },
+        "ClusterIdentifier":{
+          "shape":"String",
+          "documentation":"<p>The unique identifier of the cluster that contains the database for which you are requesting credentials. </p>"
+        },
+        "DurationSeconds":{
+          "shape":"IntegerOptional",
+          "documentation":"<p>The number of seconds until the returned temporary password expires.</p> <p>Range: 900-3600. Default: 900.</p>"
+        }
+      }
     },
     "GetReservedNodeExchangeConfigurationOptionsInputMessage":{
       "type":"structure",
@@ -6958,7 +7027,7 @@
         },
         "LogExports":{
           "shape":"LogTypeList",
-          "documentation":"<p>The collection of exported log types. Log types include the connection log, user log and user activity log.</p>"
+          "documentation":"<p>The collection of exported log types. Possible values are <code>connectionlog</code>, <code>useractivitylog</code>, and <code>userlog</code>.</p>"
         }
       },
       "documentation":"<p>Describes the status of logging for a cluster.</p>"
@@ -7000,7 +7069,7 @@
         },
         "AquaConfigurationStatus":{
           "shape":"AquaConfigurationStatus",
-          "documentation":"<p>The new value of AQUA configuration status. Possible values include the following.</p> <ul> <li> <p>enabled - Use AQUA if it is available for the current Amazon Web Services Region and Amazon Redshift node type.</p> </li> <li> <p>disabled - Don't use AQUA. </p> </li> <li> <p>auto - Amazon Redshift determines whether to use AQUA.</p> </li> </ul>"
+          "documentation":"<p>This parameter is retired. Amazon Redshift automatically determines whether to use AQUA (Advanced Query Accelerator).</p>"
         }
       }
     },
@@ -7009,7 +7078,7 @@
       "members":{
         "AquaConfiguration":{
           "shape":"AquaConfiguration",
-          "documentation":"<p>The updated AQUA configuration of the cluster. </p>"
+          "documentation":"<p>This parameter is retired. Amazon Redshift automatically determines whether to use AQUA (Advanced Query Accelerator). </p>"
         }
       }
     },
@@ -7161,7 +7230,7 @@
         },
         "MasterUserPassword":{
           "shape":"String",
-          "documentation":"<p>The new password for the cluster admin user. This change is asynchronously applied as soon as possible. Between the time of the request and the completion of the request, the <code>MasterUserPassword</code> element exists in the <code>PendingModifiedValues</code> element of the operation response. </p> <note> <p>Operations never return the password, so this operation provides a way to regain access to the admin user account for a cluster if the password is lost.</p> </note> <p>Default: Uses existing setting.</p> <p>Constraints:</p> <ul> <li> <p>Must be between 8 and 64 characters in length.</p> </li> <li> <p>Must contain at least one uppercase letter.</p> </li> <li> <p>Must contain at least one lowercase letter.</p> </li> <li> <p>Must contain one number.</p> </li> <li> <p>Can be any printable ASCII character (ASCII code 33-126) except ' (single quote), \" (double quote), \\, /, or @.</p> </li> </ul>"
+          "documentation":"<p>The new password for the cluster admin user. This change is asynchronously applied as soon as possible. Between the time of the request and the completion of the request, the <code>MasterUserPassword</code> element exists in the <code>PendingModifiedValues</code> element of the operation response. </p> <note> <p>Operations never return the password, so this operation provides a way to regain access to the admin user for a cluster if the password is lost.</p> </note> <p>Default: Uses existing setting.</p> <p>Constraints:</p> <ul> <li> <p>Must be between 8 and 64 characters in length.</p> </li> <li> <p>Must contain at least one uppercase letter.</p> </li> <li> <p>Must contain at least one lowercase letter.</p> </li> <li> <p>Must contain one number.</p> </li> <li> <p>Can be any printable ASCII character (ASCII code 33-126) except <code>'</code> (single quote), <code>\"</code> (double quote), <code>\\</code>, <code>/</code>, or <code>@</code>.</p> </li> </ul>"
         },
         "ClusterParameterGroupName":{
           "shape":"String",
@@ -8490,10 +8559,7 @@
     },
     "RestoreFromClusterSnapshotMessage":{
       "type":"structure",
-      "required":[
-        "ClusterIdentifier",
-        "SnapshotIdentifier"
-      ],
+      "required":["ClusterIdentifier"],
       "members":{
         "ClusterIdentifier":{
           "shape":"String",
@@ -8501,11 +8567,15 @@
         },
         "SnapshotIdentifier":{
           "shape":"String",
-          "documentation":"<p>The name of the snapshot from which to create the new cluster. This parameter isn't case sensitive.</p> <p>Example: <code>my-snapshot-id</code> </p>"
+          "documentation":"<p>The name of the snapshot from which to create the new cluster. This parameter isn't case sensitive. You must specify this parameter or <code>snapshotArn</code>, but not both.</p> <p>Example: <code>my-snapshot-id</code> </p>"
+        },
+        "SnapshotArn":{
+          "shape":"String",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the snapshot associated with the message to restore from a cluster. You must specify this parameter or <code>snapshotIdentifier</code>, but not both.</p>"
         },
         "SnapshotClusterIdentifier":{
           "shape":"String",
-          "documentation":"<p>The name of the cluster the source snapshot was created from. This parameter is required if your IAM user has a policy containing a snapshot resource element that specifies anything other than * for the cluster name.</p>"
+          "documentation":"<p>The name of the cluster the source snapshot was created from. This parameter is required if your IAM user or role has a policy containing a snapshot resource element that specifies anything other than * for the cluster name.</p>"
         },
         "Port":{
           "shape":"IntegerOptional",
@@ -8541,7 +8611,7 @@
         },
         "ElasticIp":{
           "shape":"String",
-          "documentation":"<p>The elastic IP (EIP) address for the cluster.</p>"
+          "documentation":"<p>The Elastic IP (EIP) address for the cluster. Don't specify the Elastic IP address for a publicly accessible cluster with availability zone relocation turned on.</p>"
         },
         "ClusterParameterGroupName":{
           "shape":"String",
@@ -8605,7 +8675,7 @@
         },
         "AquaConfigurationStatus":{
           "shape":"AquaConfigurationStatus",
-          "documentation":"<p>The value represents how the cluster is configured to use AQUA (Advanced Query Accelerator) after the cluster is restored. Possible values include the following.</p> <ul> <li> <p>enabled - Use AQUA if it is available for the current Amazon Web Services Region and Amazon Redshift node type.</p> </li> <li> <p>disabled - Don't use AQUA. </p> </li> <li> <p>auto - Amazon Redshift determines whether to use AQUA.</p> </li> </ul>"
+          "documentation":"<p>This parameter is retired. It does not set the AQUA configuration status. Amazon Redshift automatically determines whether to use AQUA (Advanced Query Accelerator).</p>"
         },
         "DefaultIamRoleArn":{
           "shape":"String",
@@ -8811,18 +8881,19 @@
     },
     "RevokeSnapshotAccessMessage":{
       "type":"structure",
-      "required":[
-        "SnapshotIdentifier",
-        "AccountWithRestoreAccess"
-      ],
+      "required":["AccountWithRestoreAccess"],
       "members":{
         "SnapshotIdentifier":{
           "shape":"String",
           "documentation":"<p>The identifier of the snapshot that the account can no longer access.</p>"
         },
+        "SnapshotArn":{
+          "shape":"String",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the snapshot associated with the message to revoke access.</p>"
+        },
         "SnapshotClusterIdentifier":{
           "shape":"String",
-          "documentation":"<p>The identifier of the cluster the snapshot was created from. This parameter is required if your IAM user has a policy containing a snapshot resource element that specifies anything other than * for the cluster name.</p>"
+          "documentation":"<p>The identifier of the cluster the snapshot was created from. This parameter is required if your IAM user or role has a policy containing a snapshot resource element that specifies anything other than * for the cluster name.</p>"
         },
         "AccountWithRestoreAccess":{
           "shape":"String",

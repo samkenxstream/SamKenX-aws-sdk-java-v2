@@ -21,6 +21,7 @@ import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import software.amazon.awssdk.annotations.SdkProtectedApi;
 import software.amazon.awssdk.annotations.SdkTestInternalApi;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
@@ -55,6 +56,8 @@ import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain;
 import software.amazon.awssdk.utils.AttributeMap;
 import software.amazon.awssdk.utils.CollectionUtils;
 import software.amazon.awssdk.utils.Logger;
+import software.amazon.awssdk.utils.Pair;
+import software.amazon.awssdk.utils.StringUtils;
 
 /**
  * An SDK-internal implementation of the methods in {@link AwsClientBuilder}, {@link AwsAsyncClientBuilder} and
@@ -80,6 +83,9 @@ public abstract class AwsDefaultClientBuilder<BuilderT extends AwsClientBuilder<
     implements AwsClientBuilder<BuilderT, ClientT> {
     private static final Logger log = Logger.loggerFor(AwsClientBuilder.class);
     private static final String DEFAULT_ENDPOINT_PROTOCOL = "https";
+    private static final String[] FIPS_SEARCH = {"fips-", "-fips"};
+    private static final String[] FIPS_REPLACE = {"", ""};
+
     private final AutoDefaultsModeDiscovery autoDefaultsModeDiscovery;
 
     protected AwsDefaultClientBuilder() {
@@ -240,7 +246,7 @@ public abstract class AwsDefaultClientBuilder<BuilderT extends AwsClientBuilder<
     private URI endpointFromConfig(SdkClientConfiguration config) {
         return new DefaultServiceEndpointBuilder(serviceEndpointPrefix(), DEFAULT_ENDPOINT_PROTOCOL)
             .withRegion(config.option(AwsClientOption.AWS_REGION))
-            .withProfileFile(() -> config.option(SdkClientOption.PROFILE_FILE))
+            .withProfileFile(config.option(SdkClientOption.PROFILE_FILE_SUPPLIER))
             .withProfileName(config.option(SdkClientOption.PROFILE_NAME))
             .putAdvancedOption(ServiceMetadataAdvancedOption.DEFAULT_S3_US_EAST_1_REGIONAL_ENDPOINT,
                                config.option(ServiceMetadataAdvancedOption.DEFAULT_S3_US_EAST_1_REGIONAL_ENDPOINT))
@@ -267,29 +273,28 @@ public abstract class AwsDefaultClientBuilder<BuilderT extends AwsClientBuilder<
             throw new IllegalStateException("No region was configured, and use-region-provider-chain was disabled.");
         }
 
-        ProfileFile profileFile = config.option(SdkClientOption.PROFILE_FILE);
+        Supplier<ProfileFile> profileFile = config.option(SdkClientOption.PROFILE_FILE_SUPPLIER);
         String profileName = config.option(SdkClientOption.PROFILE_NAME);
         return DefaultAwsRegionProviderChain.builder()
-                                            .profileFile(() -> profileFile)
+                                            .profileFile(profileFile)
                                             .profileName(profileName)
                                             .build()
                                             .getRegion();
     }
 
     private DefaultsMode resolveDefaultsMode(SdkClientConfiguration config) {
-        DefaultsMode defaultsMode =
-            config.option(AwsClientOption.DEFAULTS_MODE) != null ?
-            config.option(AwsClientOption.DEFAULTS_MODE) :
-            DefaultsModeResolver.create()
-                                .profileFile(() -> config.option(SdkClientOption.PROFILE_FILE))
-                                .profileName(config.option(SdkClientOption.PROFILE_NAME))
-                                .resolve();
+        DefaultsMode defaultsMode;
+        defaultsMode = config.option(AwsClientOption.DEFAULTS_MODE) != null ? config.option(AwsClientOption.DEFAULTS_MODE) :
+                       DefaultsModeResolver.create()
+                                           .profileFile(config.option(SdkClientOption.PROFILE_FILE_SUPPLIER))
+                                           .profileName(config.option(SdkClientOption.PROFILE_NAME))
+                                           .resolve();
 
         if (defaultsMode == DefaultsMode.AUTO) {
             defaultsMode = autoDefaultsModeDiscovery.discover(config.option(AwsClientOption.AWS_REGION));
             DefaultsMode finalDefaultsMode = defaultsMode;
             log.debug(() -> String.format("Resolved %s client's AUTO configuration mode to %s", serviceName(),
-                      finalDefaultsMode));
+                                          finalDefaultsMode));
         }
 
         return defaultsMode;
@@ -308,10 +313,10 @@ public abstract class AwsDefaultClientBuilder<BuilderT extends AwsClientBuilder<
      * Load the dualstack endpoint setting from the default provider logic.
      */
     private Boolean resolveUseDualstackFromDefaultProvider(SdkClientConfiguration config) {
-        ProfileFile profileFile = config.option(SdkClientOption.PROFILE_FILE);
+        Supplier<ProfileFile> profileFile = config.option(SdkClientOption.PROFILE_FILE_SUPPLIER);
         String profileName = config.option(SdkClientOption.PROFILE_NAME);
         return DualstackEnabledProvider.builder()
-                                       .profileFile(() -> profileFile)
+                                       .profileFile(profileFile)
                                        .profileName(profileName)
                                        .build()
                                        .isDualstackEnabled()
@@ -331,10 +336,10 @@ public abstract class AwsDefaultClientBuilder<BuilderT extends AwsClientBuilder<
      * Load the dualstack endpoint setting from the default provider logic.
      */
     private Boolean resolveUseFipsFromDefaultProvider(SdkClientConfiguration config) {
-        ProfileFile profileFile = config.option(SdkClientOption.PROFILE_FILE);
+        Supplier<ProfileFile> profileFile = config.option(SdkClientOption.PROFILE_FILE_SUPPLIER);
         String profileName = config.option(SdkClientOption.PROFILE_NAME);
         return FipsEnabledProvider.builder()
-                                  .profileFile(() -> profileFile)
+                                  .profileFile(profileFile)
                                   .profileName(profileName)
                                   .build()
                                   .isFipsEnabled()
@@ -348,7 +353,7 @@ public abstract class AwsDefaultClientBuilder<BuilderT extends AwsClientBuilder<
         return config.option(AwsClientOption.CREDENTIALS_PROVIDER) != null
                ? config.option(AwsClientOption.CREDENTIALS_PROVIDER)
                : DefaultCredentialsProvider.builder()
-                                           .profileFile(config.option(SdkClientOption.PROFILE_FILE))
+                                           .profileFile(config.option(SdkClientOption.PROFILE_FILE_SUPPLIER))
                                            .profileName(config.option(SdkClientOption.PROFILE_NAME))
                                            .build();
     }
@@ -365,7 +370,7 @@ public abstract class AwsDefaultClientBuilder<BuilderT extends AwsClientBuilder<
         }
 
         RetryMode retryMode = RetryMode.resolver()
-                                       .profileFile(() -> config.option(SdkClientOption.PROFILE_FILE))
+                                       .profileFile(config.option(SdkClientOption.PROFILE_FILE_SUPPLIER))
                                        .profileName(config.option(SdkClientOption.PROFILE_NAME))
                                        .defaultRetryMode(config.option(SdkClientOption.DEFAULT_RETRY_MODE))
                                        .resolve();
@@ -374,7 +379,19 @@ public abstract class AwsDefaultClientBuilder<BuilderT extends AwsClientBuilder<
 
     @Override
     public final BuilderT region(Region region) {
-        clientConfiguration.option(AwsClientOption.AWS_REGION, region);
+        Region regionToSet = region;
+        Boolean fipsEnabled = null;
+
+        if (region != null) {
+            Pair<Region, Optional<Boolean>> transformedRegion = transformFipsPseudoRegionIfNecessary(region);
+            regionToSet = transformedRegion.left();
+            fipsEnabled = transformedRegion.right().orElse(null);
+        }
+
+        clientConfiguration.option(AwsClientOption.AWS_REGION, regionToSet);
+        if (fipsEnabled != null) {
+            clientConfiguration.option(AwsClientOption.FIPS_ENDPOINT_ENABLED, fipsEnabled);
+        }
         return thisBuilder();
     }
 
@@ -433,4 +450,21 @@ public abstract class AwsDefaultClientBuilder<BuilderT extends AwsClientBuilder<
     public final void setDefaultsMode(DefaultsMode defaultsMode) {
         defaultsMode(defaultsMode);
     }
+
+    /**
+     * If the region is a FIPS pseudo region (contains "fips"), this method returns a pair of values, the left side being the
+     * region with the "fips" string removed, and the right being {@code true}. Otherwise, the region is returned
+     * unchanged, and the right will be empty.
+     */
+    private static Pair<Region, Optional<Boolean>> transformFipsPseudoRegionIfNecessary(Region region) {
+        String id = region.id();
+        String newId = StringUtils.replaceEach(id, FIPS_SEARCH, FIPS_REPLACE);
+        if (!newId.equals(id)) {
+            log.info(() -> String.format("Replacing input region %s with %s and setting fipsEnabled to true", id, newId));
+            return Pair.of(Region.of(newId), Optional.of(true));
+        }
+
+        return Pair.of(region, Optional.empty());
+    }
+
 }

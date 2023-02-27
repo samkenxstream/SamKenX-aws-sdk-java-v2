@@ -16,6 +16,7 @@
 package software.amazon.awssdk.core.interceptor;
 
 import java.net.URI;
+import java.util.function.Supplier;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.core.ClientType;
 import software.amazon.awssdk.core.ServiceConfiguration;
@@ -66,8 +67,7 @@ public class SdkExecutionAttribute {
     public static final ExecutionAttribute<Boolean> ENDPOINT_OVERRIDDEN = new ExecutionAttribute<>("EndpointOverridden");
 
     /**
-     * The endpoint resolved at client creation time. This is either the endpointOverride (if {@link #ENDPOINT_OVERRIDDEN} is
-     * true) or the endpoint derived from the region metadata (if {@link #ENDPOINT_OVERRIDDEN} is false).
+     * This is the endpointOverride (if {@link #ENDPOINT_OVERRIDDEN} is true), otherwise null.
      */
     public static final ExecutionAttribute<URI> CLIENT_ENDPOINT = new ExecutionAttribute<>("EndpointOverride");
 
@@ -76,7 +76,16 @@ public class SdkExecutionAttribute {
      */
     public static final ExecutionAttribute<Boolean> SIGNER_OVERRIDDEN = new ExecutionAttribute<>("SignerOverridden");
 
+    /**
+     * @deprecated This attribute is used for:
+     *             - Set profile file of service endpoint builder docdb, nepture, rds
+     * This has been replaced with {@code PROFILE_FILE_SUPPLIER.get()}.
+     */
+    @Deprecated
     public static final ExecutionAttribute<ProfileFile> PROFILE_FILE = new ExecutionAttribute<>("ProfileFile");
+
+    public static final ExecutionAttribute<Supplier<ProfileFile>> PROFILE_FILE_SUPPLIER =
+        new ExecutionAttribute<>("ProfileFileSupplier");
 
     public static final ExecutionAttribute<String> PROFILE_NAME = new ExecutionAttribute<>("ProfileName");
 
